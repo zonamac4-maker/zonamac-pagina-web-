@@ -40,7 +40,7 @@ export default async function RootLayout({ children }) {
       <div className="hright"><a className="hlink" href={WA} target="_blank" rel="noopener"><IconWhatsApp size={18} /> WhatsApp</a><CartButton /></div></header>
     <nav className="nav2" aria-label="Categorías"><div className="navin">{menu.map(c => <Link key={c.slug} href={'/categoria/' + c.slug} className={c.slug === 'semi-nuevos' ? 'green' : ''}>{c.name}</Link>)}
       <Link href="/ofertas" className="ofe">Ofertas</Link><i className="sep" />
-      <Link href="/soporte-tecnico">Soporte técnico</Link><Link href="/#visitanos">Tiendas</Link><Link href="/#beneficios">Beneficios</Link></div></nav>
+      <Link href="/soporte-tecnico">Soporte técnico</Link><Link href="/#visitanos">Tiendas</Link><Link href="/categoria/bajo-pedido">Bajo pedido</Link></div></nav>
     <div id="contenido">{children}</div>
     <footer className="foot2"><div className="fcols">
       <div><h4>Productos</h4>{menu.map(c => <Link key={c.slug} href={'/categoria/' + c.slug}>{c.name}</Link>)}<Link href="/ofertas">Ofertas</Link></div>
