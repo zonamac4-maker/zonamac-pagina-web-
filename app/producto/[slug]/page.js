@@ -3,14 +3,14 @@ import ProductDetail from '../../../components/ProductDetail';
 import ProductCard from '../../../components/ProductCard';
 import ProductRow from '../../../components/ProductRow';
 import Link from 'next/link';
-import { getProduct, getRelated, getCategory, sb, available } from '../../../lib/data';
+import { getProduct, getRelated, getCategory, sb, available, isQuote } from '../../../lib/data';
 import { SITE, JsonLd, abs, strip, cleanText } from '../../../lib/seo';
 export const revalidate = 60;
 export async function generateStaticParams() { const { data } = await sb.from('products').select('slug'); return (data || []).map(p => ({ slug: p.slug })); }
 export async function generateMetadata({ params }) {
   const { slug } = await params; const p = await getProduct(slug);
   if (!p) return { title: 'Producto no encontrado', robots: { index: false } };
-  const prices = (p.variants || []).filter(available).map(v => Number(v.precio));
+  const prices = (p.variants || []).filter(v => available(v) && !isQuote(v)).map(v => Number(v.precio));
   const from = prices.length ? ' desde $' + Math.min(...prices).toLocaleString('en-US') + ' COP' : '';
   const cond = p.condition === 'semi-nuevo' ? ' seminuevo' : '';
   const title = `Comprar ${p.name}${cond} en Bogotá${from}`;
@@ -25,7 +25,7 @@ export default async function Prod({ params }) {
   const { slug } = await params; const p = await getProduct(slug); if (!p) notFound();
   const related = await getRelated(p);
   const cat = p.category_slugs?.length ? await getCategory(p.category_slugs.find(c => c !== 'semi-nuevos' && c !== 'todos-los-iphone') || p.category_slugs[0]) : null;
-  const vs = (p.variants || []).filter(v => v.active);
+  const vs = (p.variants || []).filter(v => v.active && !isQuote(v));
   const avail = vs.filter(available);
   const prices = (avail.length ? avail : vs).map(v => Number(v.precio));
   const until = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);

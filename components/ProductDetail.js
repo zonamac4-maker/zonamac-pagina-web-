@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { readCart, writeCart } from './CartButton';
-import { WA, money, available } from '../lib/data';
+import { WA, money, available, isQuote } from '../lib/data';
 import { cleanText } from '../lib/seo';
 import { IconShield, IconWhatsApp } from './Icons';
 
@@ -16,23 +16,25 @@ export default function ProductDetail({ p }) {
     const names = [...new Set(variants.map(v => v.color).filter(Boolean))];
     return names.map(n => (p.colores || []).find(c => c.nombre === n) || { nombre: n, hex: '#c8ccd2', imagenes: [] });
   }, [p]);
-  const extraKeys = useMemo(() => [...new Set(variants.flatMap(v => Object.keys(v.attrs || {})))], [p]);
+  const extraKeys = useMemo(() => [...new Set(variants.flatMap(v => Object.keys(v.attrs || {})))].filter(k => !k.startsWith('_')), [p]);
   const dims = useMemo(() => [
     ...(colors.length ? ['color'] : []),
+    ...extraKeys.filter(k => k === 'Chip'),
     ...(variants.some(v => v.almacenamiento) ? ['almacenamiento'] : []),
-    ...extraKeys,
+    ...extraKeys.filter(k => k !== 'Chip'),
   ], [p]);
   const get = (v, d) => d === 'color' ? v.color : d === 'almacenamiento' ? v.almacenamiento : (v.attrs || {})[d];
   const label = d => d === 'color' ? 'Color' : d === 'almacenamiento' ? p.etiqueta_almacenamiento : d;
-  const values = d => { const vals = [...new Set(variants.map(v => get(v, d)).filter(Boolean))]; return d === 'almacenamiento' ? ordered(vals) : vals; };
+  const values = d => { const vals = [...new Set(variants.map(v => get(v, d)).filter(Boolean))]; return d === 'color' ? vals : ordered(vals); };
   const toSel = v => Object.fromEntries(dims.map(d => [d, get(v, d)]));
   const cIdx = c => { const i = colors.findIndex(x => x.nombre === c); return i < 0 ? 99 : i; };
-  const first = [...variants].sort((a, b) => cIdx(a.color) - cIdx(b.color) || unitVal(a.almacenamiento) - unitVal(b.almacenamiento)).find(available) || variants[0];
+  const first = [...variants].sort((a, b) => cIdx(a.color) - cIdx(b.color) || unitVal(a.almacenamiento) - unitVal(b.almacenamiento)).find(v => available(v) && !isQuote(v)) || variants.find(available) || variants[0];
   const [sel, setSel] = useState(first ? toSel(first) : {});
   const [idx, setIdx] = useState(0);
 
   const cur = variants.find(v => dims.every(d => get(v, d) === sel[d]));
-  const ok = cur && available(cur);
+  const quote = !!cur && available(cur) && isQuote(cur);
+  const ok = cur && available(cur) && !quote;
   const anyAvail = variants.some(available);
   const W = d => d === 'color' ? 4 : d === 'almacenamiento' ? 2 : 1;
   // color y almacenamiento se bloquean entre sí; las demás opciones (RAM, batería, etc.) solo exigen que exista alguna unidad disponible
@@ -41,7 +43,7 @@ export default function ProductDetail({ p }) {
   function choose(d, o) {
     if (!enabled(d, o)) return;
     const cands = variants.filter(v => available(v) && get(v, d) === o);
-    const score = v => dims.filter(e => e !== d && get(v, e) === sel[e]).reduce((a, e) => a + W(e), 0);
+    const score = v => dims.filter(e => e !== d && get(v, e) === sel[e]).reduce((a, e) => a + W(e), 0) + (isQuote(v) ? 0 : 0.5);
     const best = [...cands].sort((a, b) => score(b) - score(a))[0];
     if (best) setSel(toSel(best));
     if (d === 'color' || (best && best.color !== sel.color)) setIdx(0);
@@ -51,14 +53,17 @@ export default function ProductDetail({ p }) {
   const gallery = (color && color.imagenes && color.imagenes.length) ? color.imagenes : (p.images || []);
   const img = gallery[Math.min(idx, gallery.length - 1)];
 
-  const range = (() => { const ps = variants.filter(available).map(v => Number(v.precio)); return ps.length ? [Math.min(...ps), Math.max(...ps)] : null; })();
+  const range = (() => { const ps = variants.filter(v => available(v) && !isQuote(v)).map(v => Number(v.precio)); return ps.length ? [Math.min(...ps), Math.max(...ps)] : null; })();
   let priceEl;
-  if (cur) priceEl = <>{cur.precio_anterior && <del>{money(cur.precio_anterior)}</del>}{money(cur.precio)}</>;
+  if (quote) priceEl = <span className="quote">Precio por cotización</span>;
+  else if (cur) priceEl = <>{cur.precio_anterior && <del>{money(cur.precio_anterior)}</del>}{money(cur.precio)}</>;
   else if (range) priceEl = range[0] === range[1] ? money(range[0]) : money(range[0]) + ' – ' + money(range[1]);
   else priceEl = 'Agotado';
 
   const parts = [sel.almacenamiento, sel.color, ...extraKeys.map(k => sel[k])].filter(Boolean);
-  const msg = `Hola Zona Mac, me interesa el ${p.name}${parts.length ? ' - ' + parts.join(' - ') : ''}${ok ? ' por ' + money(cur.precio) : ''}`;
+  const msg = quote
+    ? `Hola Zona Mac, quiero cotizar el ${p.name}${parts.length ? ' - ' + parts.join(' - ') : ''}. ¿Está disponible y cuál es el precio?`
+    : `Hola Zona Mac, me interesa el ${p.name}${parts.length ? ' - ' + parts.join(' - ') : ''}${ok ? ' por ' + money(cur.precio) : ''}`;
 
   function add() {
     if (!ok) return;
@@ -86,12 +91,13 @@ export default function ProductDetail({ p }) {
           <div className="pills">{values(d).map(o => <button key={o} type="button" aria-pressed={sel[d] === o} disabled={!enabled(d, o)}
             className={'pill' + (sel[d] === o ? ' on' : '')} onClick={() => choose(d, o)}>{o}</button>)}</div></div>
       ))}
-      {cur && !ok && anyAvail && <p className="soldout">Esta combinación está agotada.</p>}
+      {quote && <p className="quotenote"><b>Esta configuración se cotiza por WhatsApp.</b> Escríbenos y te confirmamos disponibilidad, precio y tiempo de entrega.</p>}
+      {cur && !ok && !quote && anyAvail && <p className="soldout">Esta combinación está agotada.</p>}
       <div className="row">
-        <button id="add" type="button" disabled={!ok} onClick={add}>Añadir al carrito</button>
-        <a className="wabtn" href={WA + encodeURIComponent(msg)} target="_blank" rel="noopener"><IconWhatsApp size={18} /> Pedir por WhatsApp</a>
+        {!quote && <button id="add" type="button" disabled={!ok} onClick={add}>Añadir al carrito</button>}
+        <a className={'wabtn' + (quote ? ' primary' : '')} href={WA + encodeURIComponent(msg)} target="_blank" rel="noopener"><IconWhatsApp size={18} /> Pedir por WhatsApp</a>
       </div>
-      {cur && cur.sku && <p className="skuline">SKU: {cur.sku}</p>}
+      {cur && cur.sku && !quote && <p className="skuline">SKU: {cur.sku}</p>}
       {p.garantia_condiciones && <p className="warr"><IconShield size={18} /> {p.garantia_condiciones.split('. ')[0].replace(/\.$/, '')}.</p>}
     </div>
   </div>);
