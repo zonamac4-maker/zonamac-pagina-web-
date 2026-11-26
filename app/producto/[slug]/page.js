@@ -43,7 +43,7 @@ export default async function Prod({ params }) {
     <ProductDetail p={p} />
     <div className="psections">
       {larga && <section className="psec"><h2>Descripción</h2>
-        {isHtml(larga) ? <div className="rich" dangerouslySetInnerHTML={{ __html: larga }} /> : <div className="rich">{larga.split(/\n\s*\n/).map((t, i) => <p key={i}>{t}</p>)}</div>}</section>}
+        {isHtml(larga) ? <div className={'rich' + (larga.includes('class="ap"') ? ' rich-ap' : '')} dangerouslySetInnerHTML={{ __html: larga }} /> : <div className="rich">{larga.split(/\n\s*\n/).map((t, i) => <p key={i}>{t}</p>)}</div>}</section>}
       {specs.length > 0 && <section className="psec"><h2>Especificaciones</h2>
         <div className="specgrid">{specs.map(s => (<div className="specgrp" key={s.titulo}><h3>{s.titulo}</h3>
           <dl>{s.items.map((i, n) => <div className="specrow" key={i.k + n}><dt>{i.k}</dt><dd>{i.v}</dd></div>)}</dl></div>))}</div></section>}
