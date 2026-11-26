@@ -30,7 +30,7 @@ export default async function Home() {
   const [banners, ...rows] = await Promise.all([getBanners(), ...SECTIONS.map(s => getProducts({ category: s[1] }))]);
   const slides = banners.filter(b => b.product || b.link).map(b => {
     const i = b.product ? priceInfo(b.product) : null;
-    const price = b.precio_texto || (i && !i.soldout ? (i.from ? 'Desde ' : '') + money(i.min) + ' COP' : null);
+    const price = b.precio_texto || (i && !i.soldout && !i.quote ? (i.from ? 'Desde ' : '') + money(i.min) + ' COP' : null);
     return { id: b.id, eyebrow: b.eyebrow, headline: b.headline, subtitle: b.subtitle, cta: b.cta, theme: b.theme, image: b.product?.images?.[0], href: b.link || '/producto/' + b.product_slug, price,
       impact: b.theme === 'impact' && !!b.imagen, imagen: b.imagen, imagen2: b.imagen2, altoImagen: b.alto_imagen, priceWas: b.eyebrow === 'OFERTA' && i?.was ? money(i.was) : null, fondo: b.fondo, textoFondo: b.texto_fondo, chips: b.chips };
   });
